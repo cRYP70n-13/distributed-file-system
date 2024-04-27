@@ -5,7 +5,12 @@ import (
 )
 
 func main() {
-	tr := p2p.NewTCPTransport("localhost:3000")
+    tcpOpts := p2p.TCPTransportOpts{
+        ListenAddr: ":3000",
+        HandShakeFunc: p2p.NOPHandshakeFunc,
+    }
+
+	tr := p2p.NewTCPTransport(tcpOpts)
 
 	if err := tr.ListenAndAccept(); err != nil {
 		panic(err)

@@ -1,4 +1,4 @@
-module distributedStore
+module distributed-file-system
 
 go 1.21.3
 

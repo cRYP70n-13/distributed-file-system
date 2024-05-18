@@ -7,13 +7,14 @@ import (
 )
 
 func TestTCPTransport(t *testing.T) {
-    tcpOpts := TCPTransportOpts{
-        ListenAddr: ":3000",
-        HandShakeFunc: NOPHandshakeFunc,
+    testTcpOpts := TCPTransportOpts{
+        ListenAddress: ":8000",
+        HandShakeFunc: NoOpHandshake,
+        Decoder: &NoOpDecoder{},
     }
-    tr := NewTCPTransport(tcpOpts)
+    tr := NewTCPTransport(testTcpOpts)
 
-    require.Equal(t, tr.ListenAddr, tcpOpts.ListenAddr)
+    require.Equal(t, tr.ListenAddress, ":8000")
 
     err := tr.ListenAndAccept()
     require.NoError(t, err)

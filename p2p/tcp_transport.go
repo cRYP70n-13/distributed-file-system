@@ -33,15 +33,15 @@ type TCPTransportOpts struct {
 
 type TCPTransport struct {
 	TCPTransportOpts
-	listener net.Listener
-	rpcStream  chan RPC
-	peer     map[net.Addr]Peer
+	listener  net.Listener
+	rpcStream chan RPC
+	peer      map[net.Addr]Peer
 }
 
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcStream:          make(chan RPC),
+		rpcStream:        make(chan RPC),
 	}
 }
 
@@ -55,6 +55,8 @@ func (t *TCPTransport) ListenAndAccept() error {
 
 	go t.acceptLoop()
 
+	log.Printf("TCP transport listening on PORT: %s\n", t.ListenAddress)
+
 	return nil
 }
 
@@ -64,32 +66,55 @@ func (t *TCPTransport) Consume() <-chan RPC {
 	return t.rpcStream
 }
 
+// Close closes the listener in case we got a signal to stop this.
+func (t *TCPTransport) Close() error {
+	return t.listener.Close()
+}
+
+// Dial implements the transport interface.
+func (t *TCPTransport) Dial(addr string) error {
+	conn, err := net.Dial("tcp", addr)
+	if err != nil {
+		return err
+	}
+
+	isOutBound := true
+	go t.handleConn(conn, isOutBound)
+
+	return nil
+}
+
 // Close implements the peer interface.
 func (p *TCPPeer) Close() error {
 	return p.conn.Close()
 }
 
 func (t *TCPTransport) acceptLoop() {
+	isOutbound := false
 	for {
 		conn, err := t.listener.Accept()
+		if errors.Is(err, net.ErrClosed) {
+			return
+		}
+
 		if err != nil {
 			log.Printf("TCP accept error %s\n", err)
 		}
 
-		go t.handleConn(conn)
+		go t.handleConn(conn, isOutbound)
 	}
 }
 
-// FIXME: I don't like this maybe I can do better in the future
-func (t *TCPTransport) handleConn(conn net.Conn) {
+// FIXME: I don't like this maybe I can do better in the future, like creating peers with a channel or something.
+func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 	var err error
 
 	defer func() {
-        fmt.Printf("dropping peer connection for peer: %s, err => %s\n", conn.RemoteAddr(), err)
+		fmt.Printf("dropping peer connection for peer: %s, err => %s\n", conn.RemoteAddr(), err)
 		conn.Close()
 	}()
 
-	peer := NewTCPPeer(conn, true)
+	peer := NewTCPPeer(conn, isOutbound)
 
 	if err = t.HandShakeFunc(peer); err != nil {
 		return
@@ -105,7 +130,7 @@ func (t *TCPTransport) handleConn(conn net.Conn) {
 	for {
 		err := t.Decoder.Decode(peer.conn, &rpc)
 		if errors.Is(err, net.ErrClosed) {
-            fmt.Printf("TCP read error: %s\n", err.Error())
+			fmt.Printf("TCP read error: %s\n", err.Error())
 			return
 		}
 		if err != nil {

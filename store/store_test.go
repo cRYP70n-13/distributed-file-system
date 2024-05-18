@@ -8,17 +8,17 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TODO: Actually this test is breaking the single door principale I have to make some helper functions
-// to create a file and add some dummy data there
-// then use it in our tests but it is what it is.
-
 func TestStore(t *testing.T) {
 	t.Parallel()
 
-	opts := StoreOpts{
-		TransaformFunc: CascadePathTransformFunc,
-	}
-	s := NewStore(opts)
+	s := newStore(t)
+
+	defer func() {
+		_ = tearDown(t, s)
+	}()
+
+	// Hmm table testing ... I'm not sure I don't care atm
+	// And maybe a good place to try fuzz testing as well :)
 	key := "test_file"
 	testData := []byte("This is a test after the update")
 
@@ -34,11 +34,25 @@ func TestStore(t *testing.T) {
 
 	require.Equal(t, b, testData)
 
-    exists := s.Has(key)
-    require.True(t, exists, "Expected to have the key but found Naada")
+	exists := s.Has(key)
+	require.True(t, exists, "Expected to have the key but found Naada")
 
 	err = s.Delete(key)
 	require.NoError(t, err)
 
-    require.NoDirExists(t, key, "Meeeeh motherfucker")
+	require.NoDirExists(t, key, "Meeeeh motherfucker")
+}
+
+func newStore(t *testing.T) *Store {
+	t.Helper()
+
+	opts := StoreOpts{
+		TransaformFunc: CascadePathTransformFunc,
+	}
+	return NewStore(opts)
+}
+
+func tearDown(t *testing.T, s *Store) error {
+	t.Helper()
+	return s.Cleanup()
 }

@@ -67,13 +67,6 @@ func CascadePathTransformFunc(key string) PathKey {
 	}
 }
 
-func DefaultTransformFunc(key string) PathKey {
-	return PathKey{
-		Pathname: key,
-		filename: key,
-	}
-}
-
 func (s *Store) Read(key string) (io.Reader, error) {
 	f, err := s.readStream(key)
 	if err != nil {
@@ -91,8 +84,8 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return buf, nil
 }
 
-func (p PathKey) FullPath() string {
-	return fmt.Sprintf("%s/%s", p.Pathname, p.filename)
+func (s *Store) Write(key string, r io.Reader) error {
+	return s.writeStream(key, r)
 }
 
 // Delete deletes a whole folder from the system.
@@ -111,7 +104,7 @@ func (s *Store) Delete(key string) error {
 // Has Checks if a file exits or not.
 func (s *Store) Has(key string) bool {
 	pathKey := s.TransaformFunc(key)
-    fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
+	fullPathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 
 	_, err := os.Stat(fullPathWithRoot)
 
@@ -120,6 +113,22 @@ func (s *Store) Has(key string) bool {
 
 func (p PathKey) ParentFolderName() string {
 	return strings.Split(p.FullPath(), "/")[0]
+}
+
+func DefaultTransformFunc(key string) PathKey {
+	return PathKey{
+		Pathname: key,
+		filename: key,
+	}
+}
+
+func (p PathKey) FullPath() string {
+	return fmt.Sprintf("%s/%s", p.Pathname, p.filename)
+}
+
+// Cleanup just drops everything including the root folder.
+func (s *Store) Cleanup() error {
+	return os.RemoveAll(s.Root)
 }
 
 // TODO: Here we need to also consider if they Gave us a folder that

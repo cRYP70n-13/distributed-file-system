@@ -1,5 +1,7 @@
 package p2p
 
+import "net"
+
 // Transport is anything that handles the communication layer
 // between the nodes in the network, can be of form TCP/UDP/WebSockets...
 type Transport interface {
@@ -11,5 +13,7 @@ type Transport interface {
 
 // Peer is an interface that represents the remote node.
 type Peer interface {
+    Send([]byte) error
+    RemoteAddr() net.Addr
 	Close() error
 }

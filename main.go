@@ -1,48 +1,50 @@
 package main
 
 import (
+	"bytes"
+	"log"
+
 	"distributed-file-system/p2p"
 	"distributed-file-system/server"
 	"distributed-file-system/store"
-	"fmt"
-	"log"
-	"time"
 )
 
-// TODO: I can even control this with an env var flag to put it in debug mode for example.
-func OnPeer(p p2p.Peer) error {
-	// p.Close()
-	fmt.Println("Do some logic with the peer son of a mother")
-	return nil
-}
-
-func main() {
+func makeServer(listenAddr string, nodes ...string) *server.FileServer {
 	tcpTransportOps := p2p.TCPTransportOpts{
-		ListenAddress: ":4000",
+		ListenAddress: listenAddr,
 		HandShakeFunc: p2p.NoOpHandshake,
 		Decoder:       p2p.NoOpDecoder{},
-		OnPeer:        OnPeer,
 	}
 
 	tcpTransport := p2p.NewTCPTransport(tcpTransportOps)
+
 	fileServerOpts := server.FileServerOpts{
-		StorageRoot:       "4000_network",
+		StorageRoot:       listenAddr + "_network",
 		PathTransformFunc: store.CascadePathTransformFunc,
 		Transport:         tcpTransport,
-		BootstrapNodes:    []string{":3000"},
+		BootstrapNodes:    nodes,
 	}
 
 	s := server.NewFileServer(fileServerOpts)
 
-	if err := s.Start(); err != nil {
-		log.Fatal(err)
-	}
+	tcpTransport.OnPeer = s.OnPeer
+
+	return s
+
+}
+
+func main() {
+	s1 := makeServer(":3000", "")
+	s2 := makeServer(":4000", ":3000")
 
 	go func() {
-		// NOTE: This is just to test if we are closing and cleaning up correctly, and it's working fine so far
-		time.Sleep(5 * time.Minute)
-		s.Stop()
+		log.Fatal(s1.Start())
 	}()
 
-	select {}
+	_ = s2.Start()
+
+	content := bytes.NewReader([]byte("Hello from a big data file"))
+	if err := s1.StoreFile("key", content); err != nil {
+		panic(err)
+	}
 }

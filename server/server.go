@@ -1,9 +1,15 @@
 package server
 
 import (
+	"bytes"
+	"encoding/gob"
+	"io"
+	"log"
+	"net"
+	"sync"
+
 	"distributed-file-system/p2p"
 	"distributed-file-system/store"
-	"log"
 )
 
 type FileServerOpts struct {
@@ -15,6 +21,9 @@ type FileServerOpts struct {
 
 type FileServer struct {
 	FileServerOpts
+
+	mu    sync.RWMutex
+	peers map[net.Addr]p2p.Peer
 
 	store  *store.Store
 	doneCh chan struct{}
@@ -29,6 +38,8 @@ func NewFileServer(opts FileServerOpts) *FileServer {
 		FileServerOpts: opts,
 		store:          store.NewStore(storeOpts),
 		doneCh:         make(chan struct{}),
+		// Maybe add and remove peers with channels, and get rid of the mutex :)
+		peers: make(map[net.Addr]p2p.Peer),
 	}
 }
 
@@ -40,13 +51,63 @@ func (s *FileServer) Start() error {
 	if err := s.bootstrapNetwork(); err != nil {
 		panic(err)
 	}
-	go s.loop()
+
+	s.loop()
+
+	return nil
+}
+
+func (s *FileServer) StoreFile(key string, r io.Reader) error {
+	// 1. Store the file in disk first
+	// 2. Broadcast the file to all the known peers in the network.
+	// 3. Return a good response to the client :)
+	if err := s.store.Write(key, r); err != nil {
+		return err
+	}
+
+    // payload := Payload{
+    //     Key: key,
+    //     Data: ,
+    // }
+    // if err := s.broadcast(); err != nil {
+    //     return err
+    // }
+
+	return nil
+}
+
+type Payload struct {
+	Key  string
+	Data []byte
+}
+
+func (s *FileServer) OnPeer(peer p2p.Peer) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	s.peers[peer.RemoteAddr()] = peer
+	log.Printf("New peer connected successfully: %s\n", peer.RemoteAddr())
 
 	return nil
 }
 
 func (s *FileServer) Stop() {
 	close(s.doneCh)
+}
+
+func (s *FileServer) broadcast(p Payload) error {
+    buf := new(bytes.Buffer)
+
+	for _, p := range s.peers {
+        if err := gob.NewEncoder(buf).Encode(p); err != nil {
+            return err
+        }
+
+        if err := p.Send(buf.Bytes()); err != nil {
+            return err
+        }
+	}
+	return nil
 }
 
 func (s *FileServer) loop() {
@@ -70,14 +131,17 @@ func (s *FileServer) loop() {
 
 func (s *FileServer) bootstrapNetwork() error {
 	for _, addr := range s.BootstrapNodes {
-        log.Println("Bootstrapping the network...")
-		addr := addr
+		if len(addr) == 0 {
+			continue
+		}
+
+		address := addr
 		go func(addr string) {
+			log.Println("Bootstrapping the network... trying: ", addr)
 			if err := s.Transport.Dial(addr); err != nil {
 				log.Println("dial error: ", err)
-                panic(err)
 			}
-		}(addr)
+		}(address)
 	}
 
 	return nil

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"log"
+	"time"
 
 	"distributed-file-system/p2p"
 	"distributed-file-system/server"
@@ -41,10 +42,11 @@ func main() {
 		log.Fatal(s1.Start())
 	}()
 
-	_ = s2.Start()
+	go s2.Start()
+    time.Sleep(3*time.Second)
 
 	content := bytes.NewReader([]byte("Hello from a big data file"))
-	if err := s1.StoreFile("key", content); err != nil {
+	if err := s1.Store("key", content); err != nil {
 		panic(err)
 	}
 }

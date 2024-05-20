@@ -13,7 +13,6 @@ type Transport interface {
 
 // Peer is an interface that represents the remote node.
 type Peer interface {
+    net.Conn
     Send([]byte) error
-    RemoteAddr() net.Addr
-	Close() error
 }

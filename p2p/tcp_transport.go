@@ -9,8 +9,8 @@ import (
 
 // TCPPeer represents the remote node over TCP established connection.
 type TCPPeer struct {
-	// conn is the underlying connection of the peer
-	conn net.Conn
+	// conn is the underlying connection of the peer.
+	net.Conn
 
 	// if we dial and retreive a connection => outbound = true
 	// if we accept and retreive a connection => outbound = false
@@ -19,7 +19,7 @@ type TCPPeer struct {
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
-		conn:     conn,
+		Conn:     conn,
 		outbound: outbound,
 	}
 }
@@ -84,21 +84,10 @@ func (t *TCPTransport) Dial(addr string) error {
 	return nil
 }
 
-// Close implements the Peer interface.
-func (p *TCPPeer) Close() error {
-	return p.conn.Close()
-}
-
-// RemoteAddr implements the Peer interface
-// And will return the remote addr of its underlying connection.
-func (p *TCPPeer) RemoteAddr() net.Addr {
-    return p.conn.RemoteAddr()
-}
-
 // Send implements the Peer interface
 // and it will send a slice of bytes over the network.
 func (p *TCPPeer) Send(data []byte) error {
-    _, err := p.conn.Write(data)
+    _, err := p.Conn.Write(data)
     return err
 }
 
@@ -144,7 +133,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 
 	rpc := RPC{}
 	for {
-		err := t.Decoder.Decode(peer.conn, &rpc)
+		err := t.Decoder.Decode(peer.Conn, &rpc)
 		if errors.Is(err, net.ErrClosed) {
 			fmt.Printf("TCP read error: %s\n", err.Error())
 			return
@@ -154,7 +143,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 			continue
 		}
 
-		rpc.From = peer.conn.RemoteAddr()
+		rpc.From = peer.Conn.RemoteAddr()
 		t.rpcStream <- rpc
 	}
 }

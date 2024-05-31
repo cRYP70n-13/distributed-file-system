@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/gob"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -58,32 +59,54 @@ func (s *FileServer) Start() error {
 }
 
 func (s *FileServer) Store(key string, r io.Reader) error {
-	// 1. Store the file in disk first
-	// 2. Broadcast the file to all the known peers in the network.
-	// 3. Return a good response to the client :)
-	if err := s.store.Write(key, r); err != nil {
-		return err
-	}
+	// buf := new(bytes.Buffer)
+	// tee := io.TeeReader(r, buf)
 
-	buf := new(bytes.Buffer)
-	_, err := io.Copy(buf, r)
-	if err != nil {
-		return err
-	}
+    msg := Message{
+        Payload: []byte("storagekey"),
+    }
+    buf := new(bytes.Buffer)
+    if err := gob.NewEncoder(buf).Encode(&msg); err != nil {
+        return err
+    }
 
-    log.Println(buf.Bytes())
+    for _, peer := range s.peers {
+        if err := peer.Send(buf.Bytes()); err != nil {
+            return err
+        }
+    }
 
-	p := &Payload{
-	    Key: key,
-	    Data: buf.Bytes(),
-	}
+    fmt.Println("****** DONE WITH SENDING THE FIRST MESSAGE NOW SENDING THE SECOND *******")
+    payload := []byte("This is a large file")
+    for _, peer := range s.peers {
+        if err := peer.Send(payload); err != nil {
+            return err
+        }
+    }
 
-	return s.broadcast(p)
+    return nil
+
+	// if err := s.store.Write(key, tee); err != nil {
+	// 	return err
+	// }
+	// _, err := io.Copy(buf, r)
+	// if err != nil {
+	// 	return err
+	// }
+
+	// p := &DataMessage{
+	// 	Key:  key,
+	// 	Data: buf.Bytes(),
+	// }
+
+	// return s.broadcast(&Message{
+	// 	From:    "TODO",
+	// 	Payload: p,
+	// })
 }
 
-type Payload struct {
-	Key  string
-	Data []byte
+type Message struct {
+	Payload any
 }
 
 func (s *FileServer) OnPeer(peer p2p.Peer) error {
@@ -100,15 +123,16 @@ func (s *FileServer) Stop() {
 	close(s.doneCh)
 }
 
-func (s *FileServer) broadcast(p *Payload) error {
-    peers := []io.Writer{}
-    for _, peer := range s.peers {
-        peers = append(peers, peer)
-    }
+func (s *FileServer) broadcast(msg *Message) error {
+	peers := []io.Writer{}
+	for _, peer := range s.peers {
+		peers = append(peers, peer)
+	}
 
-    mw := io.MultiWriter(peers...)
+	mw := io.MultiWriter(peers...)
 
-	return gob.NewEncoder(mw).Encode(p)
+	fmt.Println("Broadcasting the msg", msg.Payload)
+	return gob.NewEncoder(mw).Encode(msg)
 }
 
 func (s *FileServer) loop() {
@@ -122,13 +146,45 @@ func (s *FileServer) loop() {
 
 	for {
 		select {
-		case msg := <-s.Transport.Consume():
-			log.Println("We've got a RPC => ", msg.From, string(msg.Payload))
+		// TODO: Maybe here I can even do this in another goroutine
+		case rpc := <-s.Transport.Consume():
+			var msg Message
+			if err := gob.NewDecoder(bytes.NewReader(rpc.Payload)).Decode(&msg); err != nil {
+				log.Println(err)
+			}
+
+            peer, ok := s.peers[rpc.From]
+            if !ok {
+                log.Panicln("Peer not found in the server's peer map")
+            }
+
+            fmt.Println("Going to read now")
+            b := make([]byte, 1000)
+            if _, err := peer.Read(b); err != nil {
+                panic(err)
+            }
+            fmt.Println("After reading...")
+            panic("Hey")
+
+			fmt.Printf("recv %s %+v\n", string(msg.Payload.([]byte)), msg)
+			// if err := s.handleMessage(&m); err != nil {
+			// 	log.Println(err)
+			// }
+
 		case <-s.doneCh:
 			return
 		}
 	}
 }
+
+// func (s *FileServer) handleMessage(msg *Message) error {
+// 	switch v := msg.Payload.(type) {
+// 	case *DataMessage:
+// 		fmt.Printf("recieved data %+v\n", v)
+// 	}
+//
+// 	return nil
+// }
 
 func (s *FileServer) bootstrapNetwork() error {
 	for _, addr := range s.BootstrapNodes {
@@ -136,13 +192,12 @@ func (s *FileServer) bootstrapNetwork() error {
 			continue
 		}
 
-		address := addr
 		go func(addr string) {
 			log.Println("Bootstrapping the network... trying: ", addr)
 			if err := s.Transport.Dial(addr); err != nil {
 				log.Println("dial error: ", err)
 			}
-		}(address)
+		}(addr)
 	}
 
 	return nil

@@ -95,7 +95,6 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		if err := peer.Send([]byte{p2p.StreamType}); err != nil {
 			return err
 		}
-		log.Println(peer.RemoteAddr().String())
 		n, err := io.Copy(peer, fileBuf)
 		if err != nil {
 			return err
@@ -126,7 +125,7 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 		return nil, err
 	}
 
-	time.Sleep(time.Second * 2)
+	time.Sleep(time.Millisecond * 2)
 
 	// TODO: Here instead of assuming that all the peers have the file and creating
 	// a buffer for each one of them we can ask them broadcast a msg if you have this
@@ -254,6 +253,14 @@ func (s *FileServer) handleMessageGetFile(from net.Addr, msg MessageGetFile) err
 	fileSize, r, err := s.store.Read(msg.Key)
 	if err != nil {
 		return err
+	}
+
+	// Yeah it's hacky but better than nothing.
+	if rc, ok := r.(io.ReadCloser); ok {
+		defer func() {
+			log.Println("Closing the readCloser reader")
+			rc.Close()
+		}()
 	}
 
 	// Send that we are about to stream some shit.

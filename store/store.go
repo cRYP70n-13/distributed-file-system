@@ -1,7 +1,6 @@
 package store
 
 import (
-	"bytes"
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
@@ -67,24 +66,8 @@ func CascadePathTransformFunc(key string) PathKey {
 	}
 }
 
-// TODO: Instead of reading this shit into memory
-// put it directly where you need it.
 func (s *Store) Read(key string) (int64, io.Reader, error) {
-	n, f, err := s.readStream(key)
-	if err != nil {
-		return 0, nil, err
-	}
-	defer f.Close()
-
-	// FIXME: Maybe just drop this shit ???
-	buf := new(bytes.Buffer)
-
-	_, err = io.Copy(buf, f)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	return n, buf, nil
+	return s.readStream(key)
 }
 
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
@@ -167,11 +150,10 @@ func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 		return 0, nil, err
 	}
 
-    fi, err := file.Stat()
+	fi, err := file.Stat()
 	if err != nil {
 		return 0, nil, err
 	}
-
 
 	return fi.Size(), file, nil
 }

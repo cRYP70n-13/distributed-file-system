@@ -16,14 +16,14 @@ type TCPPeer struct {
 	// if we accept and retrieve a connection => outbound = false
 	outbound bool
 
-	Wg *sync.WaitGroup
+	wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
-		Wg:       &sync.WaitGroup{},
+		wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -100,6 +100,12 @@ func (p *TCPPeer) Send(data []byte) error {
 	return err
 }
 
+// CloseStream will set the internal waitgroup as done
+// and implements the Peer interface.
+func (p *TCPPeer) CloseStream() {
+    p.wg.Done()
+}
+
 func (t *TCPTransport) acceptLoop() {
 	isOutbound := false
 	for {
@@ -155,9 +161,9 @@ func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 
 		rpc.From = peer.Conn.RemoteAddr()
 		if rpc.Stream {
-			peer.Wg.Add(1)
+			peer.wg.Add(1)
 			log.Printf("[%s] incoming is a stream, waiting...\n", conn.RemoteAddr())
-			peer.Wg.Wait()
+			peer.wg.Wait()
 			log.Printf("[%s] stream closed, resuming read loop...\n", conn.RemoteAddr())
 			continue
 		}

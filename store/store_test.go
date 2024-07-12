@@ -26,7 +26,7 @@ func TestStore(t *testing.T) {
 	_, err := s.writeStream(key, data)
 	require.NoError(t, err)
 
-	r, err := s.Read(key)
+	_, r, err := s.Read(key)
 	require.NoError(t, err)
 
 	b, err := io.ReadAll(r)

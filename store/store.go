@@ -67,21 +67,24 @@ func CascadePathTransformFunc(key string) PathKey {
 	}
 }
 
-func (s *Store) Read(key string) (io.Reader, error) {
-	f, err := s.readStream(key)
+// TODO: Instead of reading this shit into memory
+// put it directly where you need it.
+func (s *Store) Read(key string) (int64, io.Reader, error) {
+	n, f, err := s.readStream(key)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 	defer f.Close()
 
+	// FIXME: Maybe just drop this shit ???
 	buf := new(bytes.Buffer)
 
 	_, err = io.Copy(buf, f)
 	if err != nil {
-		return nil, err
+		return 0, nil, err
 	}
 
-	return buf, nil
+	return n, buf, nil
 }
 
 func (s *Store) Write(key string, r io.Reader) (int64, error) {
@@ -155,9 +158,20 @@ func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	return n, nil
 }
 
-func (s *Store) readStream(key string) (io.ReadCloser, error) {
+func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {
 	pathKey := s.TransaformFunc(key)
 	fullpathWithRoot := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 
-	return os.Open(fullpathWithRoot)
+	file, err := os.Open(fullpathWithRoot)
+	if err != nil {
+		return 0, nil, err
+	}
+
+    fi, err := file.Stat()
+	if err != nil {
+		return 0, nil, err
+	}
+
+
+	return fi.Size(), file, nil
 }

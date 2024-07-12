@@ -1,9 +1,8 @@
 package main
 
 import (
-	"bytes"
+	"io"
 	"log"
-	"strconv"
 	"time"
 
 	"distributed-file-system/p2p"
@@ -51,24 +50,19 @@ func main() {
 	}()
 	time.Sleep(2 * time.Second)
 
-	for i := 0; i < 10; i++ {
-		content := bytes.NewReader([]byte("Hello Otmane kimdil is preparing for his new Senior Software engineer role" + strconv.Itoa(i)))
-		if err := s1.Store("myprivatedata"+strconv.Itoa(i), content); err != nil {
-			panic(err)
-		}
-		// time.Sleep(time.Millisecond)
+	// content := bytes.NewReader([]byte("Hello Otmane kimdil is preparing for his new Senior Software engineer role"))
+	// if err := s1.Store("myImage.jpeg", content); err != nil {
+	// 	panic(err)
+	// }
+
+	r, err := s2.Get("myImage.jpeg")
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	// r, err := s1.Get("myprivatedata")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	//
-	// b, err := io.ReadAll(r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// fmt.Println(string(b))
-
-	select {}
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("=====>", string(b))
 }

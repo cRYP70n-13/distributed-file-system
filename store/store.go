@@ -84,7 +84,7 @@ func (s *Store) Read(key string) (io.Reader, error) {
 	return buf, nil
 }
 
-func (s *Store) Write(key string, r io.Reader) error {
+func (s *Store) Write(key string, r io.Reader) (int64, error) {
 	return s.writeStream(key, r)
 }
 
@@ -133,28 +133,26 @@ func (s *Store) Cleanup() error {
 
 // TODO: Here we need to also consider if they Gave us a folder that
 // already exists.
-func (s *Store) writeStream(key string, r io.Reader) error {
+func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathKey := s.TransaformFunc(key)
 	pathWithParentName := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
 	if err := os.MkdirAll(pathWithParentName, os.ModePerm); err != nil {
-		return err
+		return 0, err
 	}
 
 	fullFilePath := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
 
 	f, err := os.Create(fullFilePath)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	n, err := io.Copy(f, r)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
-	log.Printf("Written (%d) bytes to disk: %s\n", n, fullFilePath)
-
-	return nil
+	return n, nil
 }
 
 func (s *Store) readStream(key string) (io.ReadCloser, error) {

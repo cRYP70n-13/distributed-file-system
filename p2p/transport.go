@@ -9,10 +9,11 @@ type Transport interface {
 	Consume() <-chan RPC
 	Close() error
 	Dial(string) error
+	Addr() string
 }
 
 // Peer is an interface that represents the remote node.
 type Peer interface {
-    net.Conn
-    Send([]byte) error
+	net.Conn
+	Send([]byte) error
 }

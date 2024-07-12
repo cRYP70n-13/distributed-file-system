@@ -2,7 +2,6 @@ package p2p
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"net"
 	"sync"
@@ -17,14 +16,14 @@ type TCPPeer struct {
 	// if we accept and retrieve a connection => outbound = false
 	outbound bool
 
-    Wg *sync.WaitGroup
+	Wg *sync.WaitGroup
 }
 
 func NewTCPPeer(conn net.Conn, outbound bool) *TCPPeer {
 	return &TCPPeer{
 		Conn:     conn,
 		outbound: outbound,
-        Wg: &sync.WaitGroup{},
+		Wg:       &sync.WaitGroup{},
 	}
 }
 
@@ -39,13 +38,13 @@ type TCPTransport struct {
 	TCPTransportOpts
 	listener  net.Listener
 	rpcStream chan RPC
-	peer      map[net.Addr]Peer
+	// peer      map[net.Addr]Peer
 }
 
 func NewTCPTransport(opts TCPTransportOpts) *TCPTransport {
 	return &TCPTransport{
 		TCPTransportOpts: opts,
-		rpcStream:        make(chan RPC),
+		rpcStream:        make(chan RPC, 1024),
 	}
 }
 
@@ -73,6 +72,12 @@ func (t *TCPTransport) Consume() <-chan RPC {
 // Close closes the listener in case we got a signal to stop this.
 func (t *TCPTransport) Close() error {
 	return t.listener.Close()
+}
+
+// Addr implements the Transport interface
+// Just returns the address accepting the connections.
+func (t *TCPTransport) Addr() string {
+	return t.ListenAddress
 }
 
 // Dial implements the transport interface.
@@ -119,7 +124,7 @@ func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 	var err error
 
 	defer func() {
-		fmt.Printf("dropping peer connection for peer: %s, err => %s\n", conn.RemoteAddr(), err)
+		log.Printf("dropping peer connection for peer: %s, err => %s\n", conn.RemoteAddr(), err)
 		conn.Close()
 	}()
 
@@ -135,23 +140,28 @@ func (t *TCPTransport) handleConn(conn net.Conn, isOutbound bool) {
 		}
 	}
 
-	rpc := RPC{}
+	// Our read loop
 	for {
+		rpc := RPC{}
 		err := t.Decoder.Decode(peer.Conn, &rpc)
 		if errors.Is(err, net.ErrClosed) {
-			fmt.Printf("TCP read error: %s\n", err.Error())
+			log.Printf("TCP read error: %s\n", err.Error())
 			return
 		}
 		if err != nil {
-			fmt.Printf("TCP read error: %s\n", err.Error())
+			log.Printf("TCP read error: %s\n", err.Error())
 			continue
 		}
 
 		rpc.From = peer.Conn.RemoteAddr()
-        peer.Wg.Add(1)
-        fmt.Println("Waiting till the stream is done")
+		if rpc.Stream {
+			peer.Wg.Add(1)
+			log.Printf("[%s] incoming is a stream, waiting...\n", conn.RemoteAddr())
+			peer.Wg.Wait()
+			log.Printf("[%s] stream closed, resuming read loop...\n", conn.RemoteAddr())
+			continue
+		}
+
 		t.rpcStream <- rpc
-        peer.Wg.Wait()
-        fmt.Println("Stream is done continueing normal read loop")
 	}
 }

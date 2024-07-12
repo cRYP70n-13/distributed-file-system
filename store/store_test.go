@@ -23,7 +23,7 @@ func TestStore(t *testing.T) {
 	testData := []byte("This is a test after the update")
 
 	data := bytes.NewReader(testData)
-	err := s.writeStream(key, data)
+	_, err := s.writeStream(key, data)
 	require.NoError(t, err)
 
 	r, err := s.Read(key)

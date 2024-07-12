@@ -199,18 +199,6 @@ func (s *FileServer) broadcast(msg *Message) error {
 	return nil
 }
 
-func (s *FileServer) stream(msg *Message) error {
-	peers := []io.Writer{}
-	for _, peer := range s.peers {
-		peers = append(peers, peer)
-	}
-
-	mw := io.MultiWriter(peers...)
-
-	log.Println("Broadcasting the msg", msg.Payload)
-	return gob.NewEncoder(mw).Encode(msg)
-}
-
 func (s *FileServer) loop() {
 	defer func() {
 		log.Println("Sorry to tell you but we are done here sir!!")

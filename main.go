@@ -1,10 +1,11 @@
 package main
 
 import (
-	"io"
+	"bytes"
 	"log"
 	"time"
 
+	"distributed-file-system/cryptographer"
 	"distributed-file-system/p2p"
 	"distributed-file-system/server"
 	"distributed-file-system/store"
@@ -19,11 +20,15 @@ func makeServer(listenAddr string, nodes ...string) *server.FileServer {
 
 	tcpTransport := p2p.NewTCPTransport(tcpTransportOps)
 
+	encKey, _ := cryptographer.NewEncryptionKey()
+    log.Println("---> ENC_KEY: ", encKey)
+
 	fileServerOpts := server.FileServerOpts{
 		StorageRoot:       listenAddr + "_network",
 		PathTransformFunc: store.CascadePathTransformFunc,
 		Transport:         tcpTransport,
 		BootstrapNodes:    nodes,
+		EncKey:            encKey,
 	}
 
 	s := server.NewFileServer(fileServerOpts)
@@ -49,19 +54,19 @@ func main() {
 	}()
 	time.Sleep(2 * time.Second)
 
-	// content := bytes.NewReader([]byte("Hello Otmane kimdil is preparing for his new Senior Software engineer role"))
-	// if err := s1.Store("myImage.jpeg", content); err != nil {
-	// 	panic(err)
+	content := bytes.NewReader([]byte("Hello Otmane kimdil is preparing for his new Senior Software engineer role"))
+	if err := s1.Store("myImage.jpeg", content); err != nil {
+		panic(err)
+	}
+
+	// r, err := s2.Get("myImage.jpeg")
+	// if err != nil {
+	// 	log.Fatal(err)
 	// }
-
-	r, err := s2.Get("myImage.jpeg")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	b, err := io.ReadAll(r)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.Println("=====>", string(b))
+	//
+	// b, err := io.ReadAll(r)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// log.Println("=====>", string(b))
 }

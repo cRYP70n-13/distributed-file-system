@@ -16,13 +16,14 @@ func TestCopyEcnrypt(t *testing.T) {
 	key, err := cryptographer.NewEncryptionKey()
 	require.NoError(t, err)
 
-	_, err = cryptographer.CopyEncrypt(key, src, dst)
+	_, err = cryptographer.CopyDecrypt(key, src, dst)
 	require.NoError(t, err)
 	require.NotEqual(t, src, dst)
 }
 
 func TestCopyDecrypt(t *testing.T) {
     payload := "String to encrypt"
+
 	src := bytes.NewReader([]byte(payload))
 	dst := new(bytes.Buffer)
 	key, err := cryptographer.NewEncryptionKey()
@@ -39,6 +40,7 @@ func TestCopyDecrypt(t *testing.T) {
 }
 
 func TestNewEncryptionKey(t *testing.T) {
+
 	key, err := cryptographer.NewEncryptionKey()
 	require.NoError(t, err)
 	require.NotEmpty(t, key)

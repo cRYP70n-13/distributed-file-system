@@ -6,13 +6,22 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
+	"log"
 )
 
 // TODO: Add a NoopEncrypter
 
+type CryptoGrapher interface {
+    NewEncryptionKey() ([]byte, error)
+    CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
+    CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
+}
+
 const DefaultEncryptionKeyLen int = 32
 
-// NewEncryptionKey generate a random new encryption key
+// NoOpEncrypter is nothing but a naked io.Copy with nothing else.
+type NoOpEncrypter struct {}
+
 func NewEncryptionKey() ([]byte, error) {
 	keyBuf := make([]byte, DefaultEncryptionKeyLen)
 
@@ -57,6 +66,8 @@ func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 		return 0, err
 	}
 
+    log.Println("****CopyEncrypt****")
+
 	return processStream(block, iv, src, dst)
 }
 
@@ -86,5 +97,6 @@ func processStream(block cipher.Block, iv []byte, src io.Reader, dst io.Writer) 
 		}
 	}
 
+    log.Println("TOTAL_WRITTEN: ", totalWrittern)
 	return totalWrittern, nil
 }

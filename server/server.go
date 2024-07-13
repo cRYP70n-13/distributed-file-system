@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"distributed-file-system/cryptographer"
 	"distributed-file-system/p2p"
 	"distributed-file-system/store"
 )
@@ -21,6 +22,7 @@ func init() {
 }
 
 type FileServerOpts struct {
+	EncKey            []byte
 	StorageRoot       string
 	PathTransformFunc store.TransaformFunc
 	Transport         p2p.Transport
@@ -80,7 +82,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key:  key,
-			Size: size,
+			Size: size + 16,
 		},
 	}
 
@@ -95,7 +97,9 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		if err := peer.Send([]byte{p2p.StreamType}); err != nil {
 			return err
 		}
-		n, err := io.Copy(peer, fileBuf)
+
+		n, err := cryptographer.CopyEncrypt(s.EncKey, fileBuf, peer)
+		// n, err := io.Copy(peer, fileBuf)
 		if err != nil {
 			return err
 		}

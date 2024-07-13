@@ -2,6 +2,7 @@ package store
 
 import (
 	"crypto/sha1"
+	"distributed-file-system/cryptographer"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -83,7 +84,6 @@ func (s *Store) Delete(key string) error {
 		log.Printf("Deleted everything inside %s\n", firstPathNameWithRoot)
 	}()
 
-	// Anthony GG is just stupid enough to not notice this, I guess Tj or Prime would've noticed it right away.
 	return os.RemoveAll(firstPathNameWithRoot)
 }
 
@@ -117,8 +117,23 @@ func (s *Store) Cleanup() error {
 	return os.RemoveAll(s.Root)
 }
 
-// TODO: Here we need to also consider if they Gave us a folder that
-// already exists.
+func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, error) {
+	pathKey := s.TransaformFunc(key)
+	pathWithParentName := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
+	if err := os.MkdirAll(pathWithParentName, os.ModePerm); err != nil {
+		return 0, err
+	}
+
+	fullFilePath := fmt.Sprintf("%s/%s", s.Root, pathKey.FullPath())
+
+	f, err := os.Create(fullFilePath)
+	if err != nil {
+		return 0, err
+	}
+
+    return cryptographer.CopyDecrypt(encKey, r, f)
+}
+
 func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 	pathKey := s.TransaformFunc(key)
 	pathWithParentName := fmt.Sprintf("%s/%s", s.Root, pathKey.Pathname)
@@ -133,12 +148,7 @@ func (s *Store) writeStream(key string, r io.Reader) (int64, error) {
 		return 0, err
 	}
 
-	n, err := io.Copy(f, r)
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
+	return io.Copy(f, r)
 }
 
 func (s *Store) readStream(key string) (int64, io.ReadCloser, error) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"io"
 	"log"
 	"time"
 
@@ -20,8 +21,11 @@ func makeServer(listenAddr string, nodes ...string) *server.FileServer {
 
 	tcpTransport := p2p.NewTCPTransport(tcpTransportOps)
 
+	// BUG: This encryption key should not be generated each time
+	// Because it will screw the decryption, so we will generate it once
+	// and keep re-using it, I have a dirty way of doing it but let's see
 	encKey, _ := cryptographer.NewEncryptionKey()
-    log.Println("---> ENC_KEY: ", encKey)
+	log.Println("---> ENC_KEY: ", encKey)
 
 	fileServerOpts := server.FileServerOpts{
 		StorageRoot:       listenAddr + "_network",
@@ -40,7 +44,9 @@ func makeServer(listenAddr string, nodes ...string) *server.FileServer {
 
 func main() {
 	s1 := makeServer(":3000")
-	s2 := makeServer(":4000", ":3000")
+	s2 := makeServer(":6000", ":3000")
+	// s3 := makeServer(":4000", ":3000", ":6000")
+	// s4 := makeServer(":7001", ":3000", ":4000", ":6000")
 
 	// TODO: Here this time.Sleep looks like a bit hacky so we can use either a channel
 	// to signal that we are ready to go or a sync broadcaster, we gonna find out in the future.
@@ -54,19 +60,35 @@ func main() {
 	}()
 	time.Sleep(2 * time.Second)
 
-	content := bytes.NewReader([]byte("Hello Otmane kimdil is preparing for his new Senior Software engineer role"))
-	if err := s1.Store("myImage.jpeg", content); err != nil {
-		panic(err)
+	// go func() {
+	// 	log.Fatal(s3.Start())
+	// }()
+	// time.Sleep(2 * time.Second)
+	//
+	// go func() {
+	// 	log.Fatal(s4.Start())
+	// }()
+	// time.Sleep(2 * time.Second)
+
+	key := "myImage.jpeg"
+
+	content := bytes.NewReader([]byte("Hey Hey encrypt/decrypt testing"))
+	if err := s1.Store(key, content); err != nil {
+		log.Fatal(err)
 	}
 
-	// r, err := s2.Get("myImage.jpeg")
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	//
-	// b, err := io.ReadAll(r)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
-	// log.Println("=====>", string(b))
+	if err := s1.Delete(key); err != nil {
+        log.Fatal(err)
+	}
+
+	r, err := s2.Get(key)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	b, err := io.ReadAll(r)
+	if err != nil {
+		log.Fatal(err)
+	}
+	log.Println("=====>", string(b))
 }

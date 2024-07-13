@@ -6,22 +6,22 @@ import (
 	"crypto/rand"
 	"errors"
 	"io"
-	"log"
 )
 
 // TODO: Add a NoopEncrypter
 
 type CryptoGrapher interface {
-    NewEncryptionKey() ([]byte, error)
-    CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
-    CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
+	NewEncryptionKey() ([]byte, error)
+	CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
+	CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error)
 }
 
 const DefaultEncryptionKeyLen int = 32
 
 // NoOpEncrypter is nothing but a naked io.Copy with nothing else.
-type NoOpEncrypter struct {}
+type NoOpEncrypter struct{}
 
+// NewEncryptionKey gets you a random new encryption key.
 func NewEncryptionKey() ([]byte, error) {
 	keyBuf := make([]byte, DefaultEncryptionKeyLen)
 
@@ -33,7 +33,7 @@ func NewEncryptionKey() ([]byte, error) {
 }
 
 // CopyDecrypt is basically the same as io.Copy but with decryption of our own encryption.
-func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
+func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int64, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return 0, err
@@ -50,7 +50,7 @@ func CopyDecrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 }
 
 // CopyEncrypt is basically the same as io.Copy but with encryption in place.
-func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
+func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int64, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return 0, err
@@ -66,17 +66,15 @@ func CopyEncrypt(key []byte, src io.Reader, dst io.Writer) (int, error) {
 		return 0, err
 	}
 
-    log.Println("****CopyEncrypt****")
-
 	return processStream(block, iv, src, dst)
 }
 
 // processStream handles the common encryption/decryption logic.
-func processStream(block cipher.Block, iv []byte, src io.Reader, dst io.Writer) (int, error) {
+func processStream(block cipher.Block, iv []byte, src io.Reader, dst io.Writer) (int64, error) {
 	var (
 		stream        = cipher.NewCTR(block, iv)
 		buf           = make([]byte, 32*1024) // 32*1024 because that the buffer size io.Copy is using behind the scenes as a default one
-		totalWrittern = block.BlockSize()
+		totalWrittern = int64(block.BlockSize())
 	)
 
 	for {
@@ -84,7 +82,7 @@ func processStream(block cipher.Block, iv []byte, src io.Reader, dst io.Writer) 
 		if n > 0 {
 			stream.XORKeyStream(buf[:n], buf[:n])
 			written, writeErr := dst.Write(buf[:n])
-			totalWrittern += written
+			totalWrittern += int64(written)
 			if writeErr != nil {
 				return 0, writeErr
 			}
@@ -97,6 +95,5 @@ func processStream(block cipher.Block, iv []byte, src io.Reader, dst io.Writer) 
 		}
 	}
 
-    log.Println("TOTAL_WRITTEN: ", totalWrittern)
 	return totalWrittern, nil
 }

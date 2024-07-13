@@ -67,13 +67,17 @@ func (s *FileServer) Start() error {
 	return nil
 }
 
+func (s *FileServer) Delete(key string) error {
+    return s.store.Delete(key)
+}
+
 func (s *FileServer) Store(key string, r io.Reader) error {
 	var (
 		fileBuf = new(bytes.Buffer)
 		tee     = io.TeeReader(r, fileBuf)
 	)
 
-	// This is just to get the size of how much bytes are in the file.
+	// This write the current buffer to our own folder and gets us how much the size of the file is.
 	size, err := s.store.Write(key, tee)
 	if err != nil {
 		return err
@@ -90,22 +94,24 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(1 * time.Millisecond)
+	time.Sleep(35 * time.Millisecond)
 
-	// TODO: use Multiwriter here instead.
+	var writers []io.Writer
 	for _, peer := range s.peers {
 		if err := peer.Send([]byte{p2p.StreamType}); err != nil {
 			return err
 		}
 
-		n, err := cryptographer.CopyEncrypt(s.EncKey, fileBuf, peer)
-		// n, err := io.Copy(peer, fileBuf)
-		if err != nil {
-			return err
-		}
-
-		log.Println("received and written bytes to disk", n)
+		writers = append(writers, peer)
 	}
+
+    mwr := io.MultiWriter(writers...)
+	n, err := cryptographer.CopyEncrypt(s.EncKey, fileBuf, mwr)
+	if err != nil {
+		return err
+	}
+
+    log.Printf("Received and wrote %d bytes\n", n)
 
 	return nil
 }
@@ -142,12 +148,13 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 			return nil, err
 		}
 
-		n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
+		// n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
+		n, err := s.store.WriteDecrypt(s.EncKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err
 		}
 
-		log.Printf("[%s] received %d bytes over the network from (%s)", s.Transport.Addr(), n, peer.RemoteAddr())
+		log.Printf("[%s] received %d bytes over the network from (%s)", s.Transport.Addr(), n, peer.LocalAddr())
 
 		peer.CloseStream()
 	}
@@ -233,7 +240,6 @@ func (s *FileServer) loop() {
 func (s *FileServer) handleMessage(from net.Addr, msg *Message) error {
 	switch v := msg.Payload.(type) {
 	case MessageStoreFile:
-		log.Printf("recieved data %+v\n", v)
 		return s.handleMessageStoreFile(from, v)
 	case MessageGetFile:
 		return s.handleMessageGetFile(from, v)
@@ -243,6 +249,7 @@ func (s *FileServer) handleMessage(from net.Addr, msg *Message) error {
 }
 
 func (s *FileServer) handleMessageGetFile(from net.Addr, msg MessageGetFile) error {
+	log.Printf("Message get file recieved data %+v\n", msg)
 	if !s.store.Has(msg.Key) {
 		return fmt.Errorf("sorry %s but the file (%s) is not found in my disk", s.Transport.Addr(), msg.Key)
 	}
@@ -288,6 +295,7 @@ func (s *FileServer) handleMessageGetFile(from net.Addr, msg MessageGetFile) err
 }
 
 func (s *FileServer) handleMessageStoreFile(from net.Addr, msg MessageStoreFile) error {
+	log.Printf("Message store file recieved data %+v\n", msg)
 	peer, ok := s.peers[from]
 	if !ok {
 		return fmt.Errorf("peer (%s) is not found in internal peer map", from)

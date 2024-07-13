@@ -16,6 +16,9 @@ import (
 	"distributed-file-system/store"
 )
 
+// cipherBlockSize is the size of 
+const cipherBlockSize = 16
+
 func init() {
 	gob.Register(MessageStoreFile{})
 	gob.Register(MessageGetFile{})
@@ -67,10 +70,12 @@ func (s *FileServer) Start() error {
 	return nil
 }
 
+// Delete will delete the given key from the network.
 func (s *FileServer) Delete(key string) error {
     return s.store.Delete(key)
 }
 
+// Store will store and broadcast the file over the network.
 func (s *FileServer) Store(key string, r io.Reader) error {
 	var (
 		fileBuf = new(bytes.Buffer)
@@ -86,7 +91,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	msg := Message{
 		Payload: MessageStoreFile{
 			Key:  key,
-			Size: size + 16,
+			Size: size + cipherBlockSize,
 		},
 	}
 
@@ -94,7 +99,7 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 		return err
 	}
 
-	time.Sleep(35 * time.Millisecond)
+	time.Sleep(5 * time.Millisecond)
 
 	var writers []io.Writer
 	for _, peer := range s.peers {
@@ -116,6 +121,10 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 	return nil
 }
 
+// BUG: This GET will send you the file encrypted in case the guy who's asking about it
+// has a copy of it in local, so we need to make it more cleaner.
+
+// Get will get you the file you are asking for.
 func (s *FileServer) Get(key string) (io.Reader, error) {
 	if s.store.Has(key) {
 		log.Printf("[%s] File %s is being served from local disk", s.Transport.Addr(), key)
@@ -148,7 +157,6 @@ func (s *FileServer) Get(key string) (io.Reader, error) {
 			return nil, err
 		}
 
-		// n, err := s.store.Write(key, io.LimitReader(peer, fileSize))
 		n, err := s.store.WriteDecrypt(s.EncKey, key, io.LimitReader(peer, fileSize))
 		if err != nil {
 			return nil, err

@@ -5,6 +5,7 @@ import "net"
 const (
 	// MessageType is used to say that we are just sending a message.
 	MessageType = 0x1
+
 	// StreamType is used to say that we are about to stream something.
 	StreamType = 0x2
 )

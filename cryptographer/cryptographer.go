@@ -8,7 +8,7 @@ import (
 	"io"
 )
 
-// TODO: Add a NoopEncrypter
+// TODO: Add a NoopEncrypter if you don't want encryption over your nodes.
 
 type CryptoGrapher interface {
 	NewEncryptionKey() ([]byte, error)

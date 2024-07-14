@@ -42,6 +42,9 @@ func makeServer(listenAddr string, nodes ...string) *server.FileServer {
 }
 
 func main() {
+    // TODO: we have to think about a way to announce that a new server has joined
+    // and then we will need to think of how to bring him up to speed with the current state
+    // In other words automagic peer discovery.
 	s1 := makeServer(":3000")
 	s2 := makeServer(":6000", ":3000")
 	s3 := makeServer(":4000", ":3000", ":6000")

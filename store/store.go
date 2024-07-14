@@ -27,9 +27,10 @@ type PathKey struct {
 }
 
 type StoreOpts struct {
+	TransaformFunc
+
 	// Root is the parent folder of our folder tree structure.
 	Root string
-	TransaformFunc
 }
 
 type Store struct {
@@ -131,7 +132,7 @@ func (s *Store) WriteDecrypt(encKey []byte, key string, r io.Reader) (int64, err
 		return 0, err
 	}
 
-    return cryptographer.CopyDecrypt(encKey, r, f)
+	return cryptographer.CopyDecrypt(encKey, r, f)
 }
 
 func (s *Store) writeStream(key string, r io.Reader) (int64, error) {

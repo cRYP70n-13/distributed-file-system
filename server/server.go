@@ -15,8 +15,6 @@ import (
 	"distributed-file-system/p2p"
 	"distributed-file-system/store"
 )
-
-// cipherBlockSize is the size of 
 const cipherBlockSize = 16
 
 func init() {
@@ -33,13 +31,11 @@ type FileServerOpts struct {
 }
 
 type FileServer struct {
-	FileServerOpts
-
-	mu    sync.RWMutex
-	peers map[net.Addr]p2p.Peer
-
+	peers  map[net.Addr]p2p.Peer
 	store  *store.Store
 	doneCh chan struct{}
+	FileServerOpts
+	mu sync.RWMutex
 }
 
 func NewFileServer(opts FileServerOpts) *FileServer {
@@ -72,7 +68,7 @@ func (s *FileServer) Start() error {
 
 // Delete will delete the given key from the network.
 func (s *FileServer) Delete(key string) error {
-    return s.store.Delete(key)
+	return s.store.Delete(key)
 }
 
 // Store will store and broadcast the file over the network.
@@ -103,20 +99,20 @@ func (s *FileServer) Store(key string, r io.Reader) error {
 
 	var writers []io.Writer
 	for _, peer := range s.peers {
-		if err := peer.Send([]byte{p2p.StreamType}); err != nil {
-			return err
-		}
-
 		writers = append(writers, peer)
 	}
 
-    mwr := io.MultiWriter(writers...)
+	mwr := io.MultiWriter(writers...)
+	if _, err := mwr.Write([]byte{p2p.StreamType}); err != nil {
+		return err
+	}
+
 	n, err := cryptographer.CopyEncrypt(s.EncKey, fileBuf, mwr)
 	if err != nil {
 		return err
 	}
 
-    log.Printf("Received and wrote %d bytes\n", n)
+	log.Printf("Received and wrote %d bytes\n", n)
 
 	return nil
 }
